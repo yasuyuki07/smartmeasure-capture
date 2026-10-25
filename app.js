@@ -6,7 +6,7 @@
 //   情報:   *_meta.json (端末・形式・サンプリング間隔など)
 "use strict";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 const MAX_SECONDS = 40;            // 撮り忘れて止めない場合の上限
 const LOW = 0.15, GOOD = 0.3;      // 動きの強さの目安 [m/s^2] (解析側の判定に合わせる)
 const METER_FULL = 1.0;            // メーターの右端 [m/s^2]
@@ -40,7 +40,9 @@ function onMotion(e) {
   const r = e.rotationRate || {};
   const d2r = Math.PI / 180;       // rotationRate は 度/秒 (仕様) → rad/秒
   const t = eventTime(e);
-  const g = [r.beta, r.gamma, r.alpha].map((v) => (v === null || v === undefined ? NaN : v * d2r));
+  // 実際のブラウザ (iPhone の Safari・Chrome, Android の Chrome) は alpha/beta/gamma を x/y/z 軸まわりの
+  // 回転として返す (仕様の文面の alpha=z, beta=x, gamma=y とは違う)。実機 2 台の記録で確かめた
+  const g = [r.alpha, r.beta, r.gamma].map((v) => (v === null || v === undefined ? NaN : v * d2r));
   state.samples.push([t, a.x, a.y, a.z, g[0], g[1], g[2]]);
   if (state.samples.length > 200000) state.samples.splice(0, 50000);
   if (e.interval) state.interval = e.interval;
@@ -218,16 +220,22 @@ async function finish() {
              frame_rate: settings.frameRate, duration_s: sum.dur },
     imu: { file: `${base}_imu.csv`, samples: n, rate_hz: sum.rate, interval_ms: state.interval,
            columns: "t[s, 0 = 録画開始], ax ay az [m/s^2, 重力込み], gx gy gz [rad/s]",
-           frame: "W3C DeviceMotion の端末座標 (x 右, y 上, z 画面の手前)。gx,gy,gz = rotationRate の beta,gamma,alpha" },
+           frame: "W3C DeviceMotion の端末座標 (x 右, y 上, z 画面の手前)。gx,gy,gz = rotationRate の alpha,beta,gamma (x,y,z 軸まわり)" },
     screen_orientation: (screen.orientation && screen.orientation.type) || String(window.orientation ?? ""),
     motion: { median_rms: sum.med, share_above_low: sum.goodShare, low: LOW, good: GOOD },
   };
+  const json = JSON.stringify(meta, null, 2);
   const files = [
-    new File([blob], meta.video.file, { type: blob.type }),
+    // 共有できる種類は MIME の完全一致で判定されるため (Android の Chrome)、codecs などの付記は外す
+    new File([blob], meta.video.file, { type: blob.type.split(";")[0] || "video/mp4" }),
     new File([csv], meta.imu.file, { type: "text/csv" }),
-    new File([JSON.stringify(meta, null, 2)], `${base}_meta.json`, { type: "application/json" }),
+    new File([json], `${base}_meta.json`, { type: "application/json" }),
   ];
   state.files = files;
+  // Android の Chrome は .json を共有できない (共有できる種類が決まっている) ので、共有用は .txt にする
+  state.shareFiles = shareable(files) ? files
+    : [files[0], files[1], new File([json], `${base}_meta.txt`, { type: "text/plain" })];
+  if (!shareable(state.shareFiles)) state.shareFiles = shareable(files.slice(0, 2)) ? files.slice(0, 2) : null;
   renderResult(sum, settings, blob, files);
 }
 
@@ -254,8 +262,17 @@ function renderResult(sum, settings, blob, files) {
     li.append(a, b);
     ul.append(li);
   }
-  $("btn-share").hidden = !(navigator.canShare && navigator.canShare({ files }));
+  $("btn-share").hidden = !state.shareFiles;
+  $("share-hint").hidden = !state.shareFiles;
   show("screen-result");
+}
+
+function shareable(files) {
+  try {
+    return !!(navigator.canShare && navigator.canShare({ files }));
+  } catch (e) {
+    return false;
+  }
 }
 
 function download(file) {
@@ -270,7 +287,8 @@ async function shareAll() {
   const err = $("share-error");
   err.hidden = true;
   try {
-    await navigator.share({ files: state.files, title: "スマホ採寸の記録", text: "動画とセンサーの記録です" });
+    // text を付けると、iPhone で「ファイルに保存」したときに文面が .txt として一緒に保存されるので付けない
+    await navigator.share({ files: state.shareFiles, title: "スマホ採寸の記録" });
   } catch (e) {
     if (e && e.name === "AbortError") return;
     err.textContent = "共有できませんでした。「動画を保存」「センサー記録を保存」で個別に保存してください。";
@@ -286,6 +304,7 @@ function alertBox(msg) {
 function reset() {
   state.samples = state.samples.slice(-600);
   state.files = null;
+  state.shareFiles = null;
   $("elapsed").textContent = "0.0 秒";
   $("guide").textContent = "端末を左右に小さく揺らしながら、物の周りを回ってください";
   show("screen-capture");
