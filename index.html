@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111418">
+<title>スマホ採寸 撮影ツール</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 1. はじめに -->
+<main id="screen-start" class="screen sheet">
+  <div class="sheet-inner">
+    <p class="eyebrow">スマホ採寸 PoC</p>
+    <h1>撮影ツール</h1>
+    <p class="lede">動画と、スマホの動きのセンサー（加速度・ジャイロ）を同時に記録します。記録したファイルを解析に送ると、写っている物の大きさを計算できます。</p>
+    <div class="tape" aria-hidden="true"></div>
+    <h2>撮り方</h2>
+    <ol class="howto">
+      <li><b>測りたい物から 1〜2m</b> のところに立ちます。</li>
+      <li>物の周りを <b>ゆっくり回りながら</b>、端末を <b>左右に 5〜10cm 小刻みに揺らします</b>。画面の「動きの強さ」が緑になるのが目安です。</li>
+      <li><b>10〜20 秒</b> 撮ったら止めます。</li>
+    </ol>
+    <p class="note">大きさの分かる物（A4 の紙や印刷したマーカーなど）を一緒に写すと、さらに正確になります。</p>
+    <button id="btn-begin" class="btn primary" type="button">カメラとセンサーを使う</button>
+    <p id="start-error" class="error" role="alert" hidden></p>
+    <p class="fine">映像とセンサーの記録はこの端末の中だけで処理され、保存・共有を押すまでどこにも送られません。</p>
+  </div>
+</main>
+
+<!-- 2. 撮影 -->
+<main id="screen-capture" class="screen camera" hidden>
+  <video id="preview" playsinline muted autoplay></video>
+  <div class="hud top">
+    <div class="pill" id="rec-pill"><span class="dot"></span><span id="elapsed">0.0 秒</span></div>
+    <div class="meter" aria-live="polite">
+      <div class="meter-label">動きの強さ <span id="meter-text">-</span></div>
+      <div class="meter-track"><div id="meter-fill" class="meter-fill"></div><div class="meter-mark mark-lo"></div><div class="meter-mark mark-hi"></div></div>
+    </div>
+  </div>
+  <p id="guide" class="guide">端末を左右に小さく揺らしながら、物の周りを回ってください</p>
+  <p id="sensor-warning" class="warning" hidden>センサーの値が届いていません。ブラウザの設定で「モーションと画面の向き」へのアクセスを許可してください。</p>
+  <div class="hud bottom">
+    <button id="btn-record" class="rec-btn" type="button" aria-label="録画を開始"><span></span></button>
+  </div>
+</main>
+
+<!-- 3. 結果 -->
+<main id="screen-result" class="screen sheet" hidden>
+  <div class="sheet-inner">
+    <p class="eyebrow">記録できました</p>
+    <h1 id="result-title">撮影の結果</h1>
+    <div id="verdict" class="verdict"></div>
+    <dl class="facts">
+      <dt>長さ</dt><dd id="r-duration">-</dd>
+      <dt>動画</dt><dd id="r-video">-</dd>
+      <dt>センサー</dt><dd id="r-imu">-</dd>
+      <dt>動きの強さ</dt><dd id="r-motion">-</dd>
+    </dl>
+    <h2>解析に送る</h2>
+    <p class="note">次の 2 つのファイルを一緒に送ってください（情報ファイルもあると助かります）。</p>
+    <ul id="file-list" class="files"></ul>
+    <div class="actions">
+      <button id="btn-share" class="btn primary" type="button" hidden>まとめて共有する</button>
+      <button id="btn-save-video" class="btn" type="button">動画を保存</button>
+      <button id="btn-save-imu" class="btn" type="button">センサー記録を保存</button>
+      <button id="btn-save-meta" class="btn ghost" type="button">情報ファイルを保存</button>
+    </div>
+    <p id="share-error" class="error" role="alert" hidden></p>
+    <button id="btn-again" class="btn ghost wide" type="button">撮り直す</button>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
